@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="description" content="مساعدك الضريبي الشامل في إسبانيا - IRPF 2025/2026 | Spain Tax Assistant"/>
+  <meta name="keywords" content="Spain tax, IRPF, Beckham Law, Autonomo, Digital Nomad, ضريبة اسبانيا"/>
+  <meta name="theme-color" content="#0d1117"/>
+  <title>ضريبتي في إسبانيا | My Spain Tax</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🇪🇸</text></svg>"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    // localStorage polyfill for window.storage API
+    window.storage = {
+      _p: 'spaintax_',
+      set: async function(k, v) {
+        try { localStorage.setItem(this._p + k, v); } catch(e) {}
+        return { key: k, value: v };
+      },
+      get: async function(k) {
+        const v = localStorage.getItem(this._p + k);
+        if (!v) throw new Error('Not found');
+        return { key: k, value: v };
+      },
+      delete: async function(k) {
+        localStorage.removeItem(this._p + k);
+        return { key: k, deleted: true };
+      },
+      list: async function(prefix) {
+        const keys = [];
+        for(let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if(k && k.startsWith(this._p + (prefix||''))) keys.push(k.replace(this._p, ''));
+        }
+        return { keys };
+      }
+    };
+  </script>
+
+  <script type="text/babel" data-presets="react">
+    const { useState } = React;
+
+
+const T = {
+  ar: {
+    dir:"rtl",
+    appName:"ضريبتي في إسبانيا", appSub:"مساعدك الضريبي الشامل — IRPF 2025/2026",
+    langs:[["ar","🇸🇦"],["en","🇬🇧"],["es","🇪🇸"]],
+    nav:["بيكهام؟","الحاسبة","AI مستشار","الأوراق","المواعيد"],
+    checkerTitle:"هل أنا مؤهل لقانون بيكهام؟",
+    checkerSub:"أجب على 6 أسئلة — هنحدد أهليتك تلقائياً",
+    q1:"هل كنت مقيماً ضريبياً في إسبانيا خلال آخر 5 سنوات؟",
+    q2:"هل معك عقد عمل مع شركة خارج إسبانيا؟",
+    q3:"هل معك Digital Nomad Visa (DNV)؟",
+    q4:"هل نشاطك مبتكر / تقني / متخصص عالي الكفاءة؟",
+    q5:"هل سجلت في الضمان الاجتماعي الإسباني؟",
+    q6:"تاريخ التسجيل في الضمان الاجتماعي:",
+    yes:"نعم", no:"لا", notSure:"غير متأكد",
+    checkBtn:"احسب أهليتي الآن",
+    eligible:"✅ مؤهل تماماً لقانون بيكهام",
+    eligibleSub:"يمكنك التقديم على Modelo 149 والاستفادة من 24% ثابتة",
+    conditional:"⚠️ مؤهل مشروط — تحتاج Gestor",
+    conditionalSub:"نشاطك قد يؤهلك لكن يحتاج تقييم متخصص",
+    notEligible:"❌ غير مؤهل لقانون بيكهام",
+    notEligibleSub:"ضريبتك بالنظام التصاعدي العادي",
+    expired:"🚨 انتهت فرصتك! فات الـ 6 شهور",
+    expiredSub:"الموعد النهائي لتقديم Modelo 149 انتهى",
+    daysLeft:"يوم متبقي للتقديم", daysGone:"يوم انتهى",
+    deadlineLabel:"الموعد النهائي:", goCalc:"انتقل للحاسبة ←", gestorBtn:"احجز استشارة Gestor",
+    reasonsTitle:"التفاصيل:",
+    profileTitle:"بياناتك الضريبية والإقليمية", incomeType:"نوع الدخل", regionLabel:"الإقليم الإسباني",
+    regions:{madrid:"مدريد (Madrid)",catalonia:"كتالونيا (Cataluña)",andalusia:"أندلسيا (Andalucía)",valencia:"فالنسيا (Valencia)",general:"باقي الأقاليم"},
+    types:{employee:"موظف بعقد أجنبي",autonomo:"Autónomo (فريلانسر)",both:"موظف + Autónomo"},
+    grossIncome:"الدخل من العمل (€/سنة)", foreignIncome:"الدخل من خارج إسبانيا (€/سنة)",
+    autonomoIncome:"دخل الـ Autónomo (€/سنة)", savingsIncome:"دخل الفوائد والتوفير (€/سنة)",
+    situation:"الحالة الاجتماعية",
+    sits:{single:"أعزب",married:"إقرار مشترك (متزوج)",family:"إقرار فردي + أطفال"},
+    beckham:"قانون بيكهام؟", beckhamY:"نعم (24% ثابتة)", beckhamN:"لا (تصاعدي)",
+    autonomoTarifa:"هل تستفيد من Tarifa Plana؟",
+    deductions:"▼ الخصومات الإضافية",
+    dedRent:"إيجار السكن (€/سنة)", dedPension:"تبرعات خيرية (€/سنة)", dedEv:"سيارة كهربائية (€)",
+    childrenTitle:"الأطفال المعالون", numChildren:"عدد الأطفال (تحت 25 سنة)",
+    childrenUnder3:"طفل أقل من 3 سنوات؟ (+€2,800)", fnLabel:"عائلة كثيرة الأطفال؟",
+    fnNo:"لا", fnGeneral:"عادية (3+)", fnSpecial:"خاصة (5+)",
+    calcBtn:"احسب الضريبة الكاملة", childAllowLabel:"إعفاء الأطفال والعائلة",
+    resTitle:"ملخص ضريبتك الدقيق", totalGross:"إجمالي الدخل", taxBase:"الوعاء الضريبي",
+    irpfTax:"ضريبة IRPF الكلية", savingsTax:"ضريبة الفوائد", ssTax:"الضمان الاجتماعي",
+    totalTax:"إجمالي الضرائب", effectRate:"المعدل الفعلي", netIncome:"الدخل الصافي",
+    monthly:"شهرياً", saving:"توفير مقارنة بالتصاعدي", bracketsTitle:"تفاصيل الشرائح",
+    savingsTitle:"ضريبة الفوائد", autonomoTitle:"الالتزامات الفصلية التقديرية",
+    q1l:"الربع الأول",q2l:"الربع الثاني",q3l:"الربع الثالث",q4l:"الربع الرابع",
+    m130:"Modelo 130 (20%)", ivaL:"IVA التقديري (21%)", beckhamBadge:"⚡ قانون بيكهام مطبق",
+    disclaimer:"⚠️ أرقام تقديرية وفقاً لحسابات Hacienda 2025/2026. استشر Gestor معتمد للإقرار الرسمي.",
+    emailCapTitle:"احصل على ملخصك بالإيميل 📩", emailCapSub:"ملخص ضريبي كامل — مجاناً",
+    emailLabel:"البريد الإلكتروني", phoneLbl:"رقم الموبايل (اختياري)",
+    emailPh:"example@email.com", phonePh:"+971 50 000 0000",
+    consentTxt:"أوافق على استلام ملخصات ضريبية وتحديثات القوانين. يمكنني إلغاء الاشتراك في أي وقت.",
+    sendBtn:"ابعتلي الملخص", sendingBtn:"جاري الإرسال...",
+    successMsg:"✅ تم! هيوصلك الملخص قريباً", errorMsg:"❌ حاول تاني",
+    skipBtn:"تخطي", privacyNote:"🔒 بياناتك محمية وفق GDPR",
+    docsTitle:"الأوراق المطلوبة", urgentLabel:"عاجل", datesTitle:"التقويم الضريبي",
+    aiTitle:"مستشار ضريبي AI", aiSub:"اسأل أي سؤال عن ضرائبك في إسبانيا",
+    aiPh:"مثال: هل دخلي من الإمارات خاضع للضريبة؟", aiSend:"إرسال", aiThinking:"جاري التحليل...",
+    aiSugs:["هل أنا مؤهل لقانون بيكهام؟","كيف أتجنب الازدواج الضريبي؟","إيه اللي ممكن أخصمه كـ Autónomo؟","متى لازم أقدم Modelo 720؟"],
+  },
+  en: {
+    dir:"ltr",
+    appName:"My Spain Tax", appSub:"Complete Tax Assistant — IRPF 2025/2026",
+    langs:[["ar","🇸🇦"],["en","🇬🇧"],["es","🇪🇸"]],
+    nav:["Beckham?","Calculator","AI Advisor","Documents","Calendar"],
+    checkerTitle:"Am I Eligible for Beckham Law?",
+    checkerSub:"Answer 6 quick questions — we'll determine your eligibility automatically",
+    q1:"Were you a Spanish tax resident in the last 5 years?",
+    q2:"Do you have an employment contract with a company outside Spain?",
+    q3:"Do you hold a Digital Nomad Visa (DNV)?",
+    q4:"Is your activity innovative / technical / highly qualified?",
+    q5:"Have you registered with Spanish Social Security?",
+    q6:"Social Security registration date:",
+    yes:"Yes", no:"No", notSure:"Not sure",
+    checkBtn:"Check My Eligibility Now",
+    eligible:"✅ Fully Eligible for Beckham Law",
+    eligibleSub:"You can apply via Modelo 149 and benefit from flat 24% rate",
+    conditional:"⚠️ Conditionally Eligible — Gestor Needed",
+    conditionalSub:"Your activity may qualify but needs specialist assessment",
+    notEligible:"❌ Not Eligible for Beckham Law",
+    notEligibleSub:"Your tax will be calculated using the standard progressive system",
+    expired:"🚨 Window Closed! 6 months have passed",
+    expiredSub:"The deadline to submit Modelo 149 has expired",
+    daysLeft:"days left to apply", daysGone:"days expired",
+    deadlineLabel:"Deadline:", goCalc:"Go to Calculator →", gestorBtn:"Book Gestor Consultation",
+    reasonsTitle:"Details:",
+    profileTitle:"Your Tax & Regional Profile", incomeType:"Income Type", regionLabel:"Spanish Region",
+    regions:{madrid:"Madrid",catalonia:"Catalonia",andalusia:"Andalusia",valencia:"Valencia",general:"Other Regions"},
+    types:{employee:"Employee (foreign contract)",autonomo:"Autónomo (freelancer)",both:"Employee + Autónomo"},
+    grossIncome:"Employment Income (€/year)", foreignIncome:"Foreign Income (€/year)",
+    autonomoIncome:"Autónomo Income (€/year)", savingsIncome:"Interest & Savings (€/year)",
+    situation:"Marital Status", sits:{single:"Single",married:"Joint Return (Married)",family:"Single + Children"},
+    beckham:"Beckham Law?", beckhamY:"Yes (flat 24%)", beckhamN:"No (progressive)",
+    autonomoTarifa:"Eligible for Tarifa Plana?",
+    deductions:"▼ Additional Deductions",
+    dedRent:"Rent paid (€/year)", dedPension:"Charitable donations (€/year)", dedEv:"Electric vehicle (€)",
+    childrenTitle:"Dependent Children", numChildren:"Number of children (under 25)",
+    childrenUnder3:"Any child under 3 years? (+€2,800)", fnLabel:"Large family?",
+    fnNo:"No", fnGeneral:"General (3+)", fnSpecial:"Special (5+)",
+    calcBtn:"Calculate Full Tax", childAllowLabel:"Personal & Family Allowance",
+    resTitle:"Your Accurate Tax Summary", totalGross:"Total Gross Income", taxBase:"Taxable Base",
+    irpfTax:"Total IRPF Tax", savingsTax:"Savings Tax", ssTax:"Social Security",
+    totalTax:"Total Tax", effectRate:"Effective Rate", netIncome:"Net Income",
+    monthly:"monthly", saving:"Saving vs progressive", bracketsTitle:"Bracket Breakdown",
+    savingsTitle:"Savings Income Tax", autonomoTitle:"Estimated Quarterly Obligations",
+    q1l:"Q1",q2l:"Q2",q3l:"Q3",q4l:"Q4",
+    m130:"Modelo 130 (20%)", ivaL:"Est. IVA (21%)", beckhamBadge:"⚡ Beckham Law applied",
+    disclaimer:"⚠️ Estimates based on 2025/2026 Hacienda mechanics. Consult a certified Gestor for official filing.",
+    emailCapTitle:"Get Your Summary by Email 📩", emailCapSub:"Full tax summary — completely free",
+    emailLabel:"Email Address", phoneLbl:"Mobile (optional)",
+    emailPh:"example@email.com", phonePh:"+34 600 000 000",
+    consentTxt:"I agree to receive tax summaries and regulatory updates. I can unsubscribe at any time.",
+    sendBtn:"Send My Summary", sendingBtn:"Sending...",
+    successMsg:"✅ Done! Your summary will arrive shortly", errorMsg:"❌ Try again",
+    skipBtn:"Skip", privacyNote:"🔒 Your data is protected under GDPR",
+    docsTitle:"Required Documents", urgentLabel:"Urgent", datesTitle:"Tax Calendar",
+    aiTitle:"AI Tax Advisor", aiSub:"Ask any question about your Spanish taxes",
+    aiPh:"e.g. Is my UAE income taxable in Spain?", aiSend:"Send", aiThinking:"Analysing...",
+    aiSugs:["Am I eligible for Beckham Law?","How to avoid double taxation Spain-UAE?","What can I deduct as Autónomo?","When must I file Modelo 720?"],
+  },
+  es: {
+    dir:"ltr",
+    appName:"Mi Impuesto España", appSub:"Asistente Fiscal Completo — IRPF 2025/2026",
+    langs:[["ar","🇸🇦"],["en","🇬🇧"],["es","🇪🇸"]],
+    nav:["¿Beckham?","Calculadora","Asesor AI","Documentos","Calendario"],
+    checkerTitle:"¿Soy Elegible para la Ley Beckham?",
+    checkerSub:"Responde 6 preguntas — determinaremos tu elegibilidad automáticamente",
+    q1:"¿Fuiste residente fiscal en España en los últimos 5 años?",
+    q2:"¿Tienes contrato laboral con empresa fuera de España?",
+    q3:"¿Tienes Visa de Nómada Digital (DNV)?",
+    q4:"¿Tu actividad es innovadora / técnica / altamente cualificada?",
+    q5:"¿Te has dado de alta en la Seguridad Social española?",
+    q6:"Fecha de alta en la Seguridad Social:",
+    yes:"Sí", no:"No", notSure:"No seguro",
+    checkBtn:"Verificar Mi Elegibilidad",
+    eligible:"✅ Totalmente Elegible para la Ley Beckham",
+    eligibleSub:"Puedes solicitar mediante el Modelo 149 y beneficiarte del tipo fijo del 24%",
+    conditional:"⚠️ Elegibilidad Condicional — Necesitas Gestor",
+    conditionalSub:"Tu actividad podría cualificarte pero necesita evaluación especializada",
+    notEligible:"❌ No Elegible para la Ley Beckham",
+    notEligibleSub:"Tu impuesto se calculará con el sistema progresivo estándar",
+    expired:"🚨 ¡Plazo Cerrado! Han pasado los 6 meses",
+    expiredSub:"El plazo para presentar el Modelo 149 ha expirado",
+    daysLeft:"días restantes", daysGone:"días caducados",
+    deadlineLabel:"Plazo:", goCalc:"Ir a la Calculadora →", gestorBtn:"Reservar Consulta Gestor",
+    reasonsTitle:"Detalles:",
+    profileTitle:"Tu Perfil Fiscal y Autonómico", incomeType:"Tipo de Ingresos", regionLabel:"Comunidad Autónoma",
+    regions:{madrid:"Madrid",catalonia:"Cataluña",andalusia:"Andalucía",valencia:"Valencia",general:"Otras Regiones"},
+    types:{employee:"Empleado (contrato extranjero)",autonomo:"Autónomo (freelancer)",both:"Empleado + Autónomo"},
+    grossIncome:"Ingresos del trabajo (€/año)", foreignIncome:"Ingresos extranjeros (€/año)",
+    autonomoIncome:"Ingresos autónomo (€/año)", savingsIncome:"Intereses y ahorros (€/año)",
+    situation:"Estado Civil", sits:{single:"Soltero/a",married:"Declaración Conjunta",family:"Individual + Hijos"},
+    beckham:"¿Ley Beckham?", beckhamY:"Sí (tipo fijo 24%)", beckhamN:"No (progresivo)",
+    autonomoTarifa:"¿Disfrutas de Tarifa Plana?",
+    deductions:"▼ Deducciones Adicionales",
+    dedRent:"Alquiler pagado (€/año)", dedPension:"Donaciones benéficas (€/año)", dedEv:"Vehículo eléctrico (€)",
+    childrenTitle:"Hijos a Cargo", numChildren:"Número de hijos (menores de 25)",
+    childrenUnder3:"¿Algún hijo menor de 3 años? (+€2,800)", fnLabel:"¿Familia numerosa?",
+    fnNo:"No", fnGeneral:"General (3+)", fnSpecial:"Especial (5+)",
+    calcBtn:"Calcular Impuesto Completo", childAllowLabel:"Mínimo Personal y Familiar",
+    resTitle:"Tu Resumen Fiscal Exacto", totalGross:"Ingresos Brutos Totales", taxBase:"Base Imponible",
+    irpfTax:"Cuota IRPF Total", savingsTax:"Impuesto Ahorro", ssTax:"Seguridad Social",
+    totalTax:"Impuesto Total", effectRate:"Tipo Efectivo", netIncome:"Renta Neta",
+    monthly:"mensual", saving:"Ahorro vs progresivo", bracketsTitle:"Desglose por Tramos",
+    savingsTitle:"Rendimientos del Ahorro", autonomoTitle:"Obligaciones Trimestrales Estimadas",
+    q1l:"T1",q2l:"T2",q3l:"T3",q4l:"T4",
+    m130:"Modelo 130 (20%)", ivaL:"IVA Est. (21%)", beckhamBadge:"⚡ Ley Beckham aplicada",
+    disclaimer:"⚠️ Estimaciones orientativas basadas en Hacienda 2025/2026. Consulte un gestor certificado.",
+    emailCapTitle:"Recibe tu resumen por email 📩", emailCapSub:"Resumen fiscal completo — gratis",
+    emailLabel:"Correo electrónico", phoneLbl:"Móvil (opcional)",
+    emailPh:"ejemplo@email.com", phonePh:"+34 600 000 000",
+    consentTxt:"Acepto recibir resúmenes fiscales y actualizaciones normativas. Puedo darme de baja en cualquier momento.",
+    sendBtn:"Enviarme el resumen", sendingBtn:"Enviando...",
+    successMsg:"✅ ¡Listo! Tu resumen llegará pronto", errorMsg:"❌ Inténtalo de nuevo",
+    skipBtn:"Omitir", privacyNote:"🔒 Datos protegidos bajo RGPD",
+    docsTitle:"Documentación Requerida", urgentLabel:"Urgente", datesTitle:"Calendario Fiscal",
+    aiTitle:"Asesor Fiscal AI", aiSub:"Pregunta cualquier duda sobre tus impuestos",
+    aiPh:"ej. ¿Mis ingresos de EAU tributan en España?", aiSend:"Enviar", aiThinking:"Analizando...",
+    aiSugs:["¿Soy elegible para la Ley Beckham?","¿Cómo evitar doble imposición?","¿Qué puedo deducir como autónomo?","¿Cuándo presentar el Modelo 720?"],
+  }
+};
+
+// ─── TAX ENGINE ───────────────────────────────────────────────────────────────
+const SCALES = {
+  madrid:    [{min:0,max:12450,r:.18},{min:12450,max:20200,r:.23},{min:20200,max:35200,r:.285},{min:35200,max:60000,r:.355},{min:60000,max:300000,r:.435},{min:300000,max:Infinity,r:.455}],
+  catalonia: [{min:0,max:12450,r:.20},{min:12450,max:20200,r:.25},{min:20200,max:35200,r:.31},{min:35200,max:60000,r:.38},{min:60000,max:175000,r:.46},{min:175000,max:300000,r:.48},{min:300000,max:Infinity,r:.50}],
+  general:   [{min:0,max:12450,r:.19},{min:12450,max:20200,r:.24},{min:20200,max:35200,r:.30},{min:35200,max:60000,r:.37},{min:60000,max:300000,r:.45},{min:300000,max:Infinity,r:.47}],
+};
+SCALES.andalusia = SCALES.madrid;
+SCALES.valencia  = SCALES.catalonia;
+
+const SAV = [{min:0,max:6000,r:.19},{min:6000,max:50000,r:.21},{min:50000,max:200000,r:.23},{min:200000,max:300000,r:.27},{min:300000,max:Infinity,r:.30}];
+const CHILD_ALLOW = [2400,2700,4000,4500];
+const PERSONAL = {single:5550,married:6700,family:5550};
+
+function calcBrackets(base, table) {
+  let tax=0, det=[];
+  for(const b of table){
+    if(base<=b.min) break;
+    const chunk=Math.min(base, b.max===Infinity?base+1:b.max)-b.min;
+    tax+=chunk*b.r;
+    det.push({min:b.min,max:b.max,r:b.r*100,chunk,tax:chunk*b.r});
+  }
+  return {tax,det};
+}
+
+function getAutonomoSS(netYield) {
+  const m=netYield/12;
+  if(m<=670)  return 200*12;
+  if(m<=900)  return 260*12;
+  if(m<=1166) return 290*12;
+  if(m<=1700) return 330*12;
+  if(m<=2330) return 370*12;
+  if(m<=3620) return 440*12;
+  if(m<=6000) return 530*12;
+  return 590*12;
+}
+
+function childAllow(n,under3){ let a=0; for(let i=0;i<n;i++) a+=i<4?CHILD_ALLOW[i]:CHILD_ALLOW[3]; if(under3&&n>0) a+=2800; return a; }
+function fnCredit(fn){ return fn==="general"?1200:fn==="special"?2400:0; }
+
+function runCalc(f){
+  const emp  = f.type!=="autonomo"?f.gross:0;
+  const aut  = f.type!=="employee"?f.auto:0;
+  const work = emp+aut;
+  const gross= work+f.foreign+f.savings;
+  const ssEmp= f.type!=="autonomo"?Math.min(emp*.0635,4495):0;
+  const ssAut= f.type!=="employee"&&aut>0?(f.autonomoTarifa?86.65*12:getAutonomoSS(aut*.93)):0;
+  const ss   = ssEmp+ssAut;
+  const scale= SCALES[f.region]||SCALES.general;
+  const genExp  = f.type!=="autonomo"?2000:0;
+  const autExp  = f.type!=="employee"?aut*.07:0;
+  const taxBase = Math.max(0,work+f.foreign-ss-genExp-autExp);
+  const pa   = PERSONAL[f.sit]||5550;
+  const ca   = childAllow(f.kids,f.under3);
+  const famMin = pa+ca;
+  const extraDed = Math.min(f.rent*.15,9040)+Math.min(f.pension*.80,1500)+Math.min(f.ev*.15,3000);
+  let irpf=0,det=[],bSave=0;
+  if(f.beckham){
+    irpf=work*.24;
+    const stdTax=Math.max(0,calcBrackets(taxBase,scale).tax-calcBrackets(famMin,scale).tax-fnCredit(f.fn));
+    bSave=Math.max(0,stdTax-irpf);
+  } else {
+    const grossTax=calcBrackets(taxBase,scale);
+    const minCredit=calcBrackets(famMin,scale).tax;
+    irpf=Math.max(0,grossTax.tax-minCredit-extraDed-fnCredit(f.fn));
+    det=grossTax.det;
+  }
+  const savRes=calcBrackets(f.savings,SAV);
+  const totalTax=irpf+savRes.tax+ss;
+  const net=gross-totalTax;
+  const qInc=aut/4;
+  return {gross,ss,ca:famMin,irpf,savTax:savRes.tax,savDet:savRes.det,totalTax,net,eff:gross>0?((totalTax/gross)*100).toFixed(1):0,det,bSave,qIRPF:qInc*.20,qIVA:aut>0?qInc*.21:0,qSS:aut>0?(f.autonomoTarifa?86.65:getAutonomoSS(aut*.93)/12):0};
+}
+
+// ─── BECKHAM ENGINE ───────────────────────────────────────────────────────────
+function checkBeckham(a){
+  const {res,contract,dnv,qualified,ss,ssDate}=a;
+  if(res==="yes") return {status:"not_eligible",reasons:[{t:"bad",ar:"كنت مقيماً ضريبياً في إسبانيا — شرط أساسي غير متحقق",en:"You were a Spanish tax resident — core condition not met",es:"Fuiste residente fiscal en España — condición básica no cumplida"}],days:null,deadline:null};
+  let days=null,deadline=null;
+  const reasons=[];
+  if(ss==="yes"&&ssDate){
+    const d=new Date(ssDate),dead=new Date(d);
+    dead.setMonth(dead.getMonth()+6);
+    deadline=dead.toLocaleDateString();
+    days=Math.floor((dead-new Date())/86400000);
+    if(days<0) return {status:"expired",reasons:[{t:"bad",ar:`انتهى ${Math.abs(days)} يوم من الموعد النهائي`,en:`${Math.abs(days)} days past the deadline`,es:`${Math.abs(days)} días pasado el plazo`}],days,deadline};
+    reasons.push({t:days<30?"warn":"good",ar:`باقي ${days} يوم للتقديم على Modelo 149`,en:`${days} days left to file Modelo 149`,es:`${days} días para presentar Modelo 149`});
+  }
+  let status="not_eligible";
+  if(contract==="yes"){
+    status="eligible";
+    reasons.push({t:"good",ar:"✓ عقد عمل مع شركة أجنبية — الحالة المثلى",en:"✓ Foreign employment contract — ideal case",es:"✓ Contrato con empresa extranjera — caso ideal"});
+    if(dnv==="yes") reasons.push({t:"good",ar:"✓ Digital Nomad Visa تعزز أهليتك",en:"✓ Digital Nomad Visa strengthens eligibility",es:"✓ Visa Nómada Digital refuerza la elegibilidad"});
+  } else if(dnv==="yes"&&qualified==="yes"){
+    status="conditional";
+    reasons.push({t:"warn",ar:"⚠ DNV + نشاط متخصص — محتاج تقييم Gestor",en:"⚠ DNV + qualified activity — Gestor assessment needed",es:"⚠ DNV + actividad cualificada — necesita evaluación de gestor"});
+  } else {
+    reasons.push({t:"bad",ar:"لا عقد أجنبي ولا DNV مؤهل — غير مؤهل",en:"No qualifying foreign contract or DNV — not eligible",es:"Sin contrato extranjero ni DNV cualificado — no elegible"});
+  }
+  return {status,reasons,days,deadline};
+}
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+const DOCS={
+  ar:[
+    {i:"🪪",n:"NIE / بطاقة هوية",d:"رقم التعريف الضريبي",t:["IRPF","Autónomo","أجنبي","بيكهام"]},
+    {i:"🏛️",n:"TIE Card",d:"كارت الإقامة الرسمي",t:["IRPF","بيكهام"]},
+    {i:"📋",n:"Empadronamiento",d:"شهادة التسجيل البلدي",t:["IRPF","Autónomo"]},
+    {i:"📄",n:"Modelo 100",d:"الإقرار الضريبي السنوي IRPF",t:["IRPF"]},
+    {i:"📝",n:"Modelo 149",d:"طلب قانون بيكهام — خلال 6 شهور",t:["بيكهام"]},
+    {i:"🌍",n:"Modelo 720",d:"إقرار الأصول خارج إسبانيا +€50,000",t:["أجنبي"]},
+    {i:"💼",n:"عقد العمل الأجنبي",d:"إثبات العقد مع الشركة الأجنبية",t:["أجنبي","بيكهام"]},
+    {i:"🧾",n:"Alta Autónomos TA.0521",d:"التسجيل في الضمان الاجتماعي",t:["Autónomo"]},
+    {i:"📊",n:"Modelo 036/037",d:"التسجيل في Hacienda كـ Autónomo",t:["Autónomo"]},
+    {i:"🧮",n:"Modelo 130",d:"الدفعات المقدمة الفصلية",t:["Autónomo"]},
+    {i:"🧾",n:"Modelo 303",d:"الإقرار الفصلي لضريبة IVA",t:["Autónomo"]},
+    {i:"🏦",n:"كشف حساب بنكي",d:"يثبت الدخل المحوّل لإسبانيا",t:["IRPF","أجنبي"]},
+    {i:"💰",n:"شهادة الفوائد البنكية",d:"من كل حساب توفير في إسبانيا",t:["IRPF"]},
+    {i:"🏠",n:"عقد الإيجار",d:"لخصم 15% من الإيجار",t:["IRPF"]},
+    {i:"🤝",n:"اتفاقية تجنب الازدواج الضريبي",d:"معاهدة إسبانيا مع بلدك",t:["أجنبي"]},
+  ],
+  en:[
+    {i:"🪪",n:"NIE / ID Card",d:"Tax identification number",t:["IRPF","Autónomo","Foreign","Beckham"]},
+    {i:"🏛️",n:"TIE Card",d:"Official Spanish residence card",t:["IRPF","Beckham"]},
+    {i:"📋",n:"Empadronamiento",d:"Municipal registration certificate",t:["IRPF","Autónomo"]},
+    {i:"📄",n:"Modelo 100",d:"Annual IRPF tax return",t:["IRPF"]},
+    {i:"📝",n:"Modelo 149",d:"Beckham Law application — within 6 months",t:["Beckham"]},
+    {i:"🌍",n:"Modelo 720",d:"Declaration of foreign assets +€50,000",t:["Foreign"]},
+    {i:"💼",n:"Foreign Employment Contract",d:"Proof of contract outside Spain",t:["Foreign","Beckham"]},
+    {i:"🧾",n:"Alta Autónomos TA.0521",d:"Social Security registration",t:["Autónomo"]},
+    {i:"📊",n:"Modelo 036/037",d:"Hacienda registration as Autónomo",t:["Autónomo"]},
+    {i:"🧮",n:"Modelo 130",d:"Quarterly IRPF advance payments",t:["Autónomo"]},
+    {i:"🧾",n:"Modelo 303",d:"Quarterly IVA return",t:["Autónomo"]},
+    {i:"🏦",n:"Bank Statement",d:"Proving income transferred to Spain",t:["IRPF","Foreign"]},
+    {i:"💰",n:"Interest Certificate",d:"From all savings accounts in Spain",t:["IRPF"]},
+    {i:"🏠",n:"Rental Contract",d:"To claim 15% rental deduction",t:["IRPF"]},
+    {i:"🤝",n:"Double Tax Treaty",d:"Spain's treaty with your country",t:["Foreign"]},
+  ],
+  es:[
+    {i:"🪪",n:"NIE / DNI",d:"Número de identificación fiscal",t:["IRPF","Autónomo","Extranjero","Beckham"]},
+    {i:"🏛️",n:"Tarjeta TIE",d:"Tarjeta de residencia oficial",t:["IRPF","Beckham"]},
+    {i:"📋",n:"Empadronamiento",d:"Certificado de registro municipal",t:["IRPF","Autónomo"]},
+    {i:"📄",n:"Modelo 100",d:"Declaración anual del IRPF",t:["IRPF"]},
+    {i:"📝",n:"Modelo 149",d:"Solicitud Ley Beckham — en 6 meses",t:["Beckham"]},
+    {i:"🌍",n:"Modelo 720",d:"Declaración bienes extranjeros +€50.000",t:["Extranjero"]},
+    {i:"💼",n:"Contrato laboral extranjero",d:"Acreditación del contrato fuera de España",t:["Extranjero","Beckham"]},
+    {i:"🧾",n:"Alta Autónomos TA.0521",d:"Alta en Seguridad Social",t:["Autónomo"]},
+    {i:"📊",n:"Modelo 036/037",d:"Alta en Hacienda como autónomo",t:["Autónomo"]},
+    {i:"🧮",n:"Modelo 130",d:"Pagos fraccionados trimestrales",t:["Autónomo"]},
+    {i:"🧾",n:"Modelo 303",d:"Declaración trimestral del IVA",t:["Autónomo"]},
+    {i:"🏦",n:"Extracto bancario",d:"Que acredite ingresos transferidos",t:["IRPF","Extranjero"]},
+    {i:"💰",n:"Certificado de intereses",d:"De cuentas de ahorro en España",t:["IRPF"]},
+    {i:"🏠",n:"Contrato de alquiler",d:"Para deducción del 15% del alquiler",t:["IRPF"]},
+    {i:"🤝",n:"Convenio de doble imposición",d:"Tratado España con tu país",t:["Extranjero"]},
+  ]
+};
+
+const DATES={
+  ar:[
+    {p:"8 أبريل",l:"يفتح التقديم الإلكتروني",d:"بداية Campaña Renta 2025",c:"#27ae60",u:false},
+    {p:"أبريل",l:"Modelo 130 — الربع الأول",d:"دفعة مقدمة IRPF للـ Autónomo",c:"#e67e22",u:false},
+    {p:"20 أبريل",l:"Modelo 303 — IVA الربع الأول",d:"الإقرار الفصلي لضريبة IVA",c:"#e67e22",u:false},
+    {p:"25 يونيو",l:"⚡ آخر موعد للدفع المباشر",d:"Domiciliación bancaria",c:"#e74c3c",u:true},
+    {p:"30 يونيو",l:"⚡ الموعد النهائي لـ Renta",d:"آخر يوم لتقديم إقرار IRPF 2025",c:"#e74c3c",u:true},
+    {p:"يوليو",l:"Modelo 130 — الربع الثاني",d:"دفعة مقدمة IRPF",c:"#e67e22",u:false},
+    {p:"أكتوبر",l:"Modelo 130 — الربع الثالث",d:"دفعة مقدمة IRPF",c:"#e67e22",u:false},
+    {p:"خلال 6 شهور",l:"⚡ Modelo 149 — بيكهام",d:"من تاريخ التسجيل في الضمان — لا تفوّته!",c:"#8e44ad",u:true},
+    {p:"كل عام قبل 31 مارس",l:"Modelo 720",d:"إقرار الأصول خارج إسبانيا +€50,000",c:"#3498db",u:false},
+  ],
+  en:[
+    {p:"8 April",l:"Online filing opens",d:"Campaña Renta 2025 begins",c:"#27ae60",u:false},
+    {p:"April",l:"Modelo 130 — Q1",d:"Quarterly IRPF advance for Autónomo",c:"#e67e22",u:false},
+    {p:"20 April",l:"Modelo 303 — IVA Q1",d:"Quarterly VAT return",c:"#e67e22",u:false},
+    {p:"25 June",l:"⚡ Direct debit deadline",d:"Domiciliación bancaria",c:"#e74c3c",u:true},
+    {p:"30 June",l:"⚡ Final Renta deadline",d:"Last day to file IRPF 2025",c:"#e74c3c",u:true},
+    {p:"July",l:"Modelo 130 — Q2",d:"Quarterly IRPF advance",c:"#e67e22",u:false},
+    {p:"October",l:"Modelo 130 — Q3",d:"Quarterly IRPF advance",c:"#e67e22",u:false},
+    {p:"Within 6 months",l:"⚡ Modelo 149 — Beckham",d:"From SS registration — don't miss it!",c:"#8e44ad",u:true},
+    {p:"Annually by 31 March",l:"Modelo 720",d:"Foreign assets declaration +€50,000",c:"#3498db",u:false},
+  ],
+  es:[
+    {p:"8 Abril",l:"Apertura presentación online",d:"Inicio Campaña Renta 2025",c:"#27ae60",u:false},
+    {p:"Abril",l:"Modelo 130 — T1",d:"Pago fraccionado IRPF autónomos",c:"#e67e22",u:false},
+    {p:"20 Abril",l:"Modelo 303 — IVA T1",d:"Declaración trimestral del IVA",c:"#e67e22",u:false},
+    {p:"25 Junio",l:"⚡ Límite domiciliación",d:"Si el resultado es a pagar",c:"#e74c3c",u:true},
+    {p:"30 Junio",l:"⚡ Plazo final Renta",d:"Último día declaración IRPF 2025",c:"#e74c3c",u:true},
+    {p:"Julio",l:"Modelo 130 — T2",d:"Pago fraccionado IRPF",c:"#e67e22",u:false},
+    {p:"Octubre",l:"Modelo 130 — T3",d:"Pago fraccionado IRPF",c:"#e67e22",u:false},
+    {p:"En 6 meses",l:"⚡ Modelo 149 — Beckham",d:"Desde alta en SS — ¡no lo pierdas!",c:"#8e44ad",u:true},
+    {p:"Antes 31 Marzo",l:"Modelo 720",d:"Bienes en extranjero +€50.000",c:"#3498db",u:false},
+  ]
+};
+
+// ─── AI ───────────────────────────────────────────────────────────────────────
+async function askAI(q,lang){
+  const sys={
+    ar:"أنت مستشار ضريبي متخصص في IRPF إسبانيا 2025/2026، قانون بيكهام، Autónomo، الدخل الأجنبي، الازدواج الضريبي إسبانيا-الإمارات، Digital Nomad Visa. أجب بالعربية بوضوح واختصار. أضف دائماً تحذيراً باستشارة Gestor معتمد.",
+    en:"You are a tax advisor specialising in Spanish IRPF 2025/2026, Beckham Law, Autónomo, foreign income, Spain-UAE double taxation, Digital Nomad Visa. Answer clearly and concisely. Always end with a disclaimer to consult a certified Gestor.",
+    es:"Eres asesor fiscal especializado en IRPF español 2025/2026, Ley Beckham, autónomos, rentas extranjeras, doble imposición España-EAU, Visa Nómada Digital. Responde con claridad. Termina siempre con aviso de consultar gestor certificado."
+  };
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:sys[lang]||sys.en,messages:[{role:"user",content:q}]})});
+  const d=await res.json();
+  return d.content?.[0]?.text||"Error";
+}
+
+const fmt=n=>new Intl.NumberFormat("de-DE",{minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.round(n));
+const fE=n=>`€${fmt(n)}`;
+
+// ─── APP ─────────────────────────────────────────────────────────────────────
+function App(){
+  const [lang,setLang]=useState("ar");
+  const [tab,setTab]=useState(0);
+  const t=T[lang]; const isRTL=lang==="ar";
+
+  const [ck,setCk]=useState({res:"",contract:"",dnv:"",qualified:"",ss:"",ssDate:""});
+  const [ckRes,setCkRes]=useState(null);
+
+  const [form,setForm]=useState({type:"employee",region:"madrid",gross:"",foreign:"",auto:"",savings:"",sit:"single",beckham:false,autonomoTarifa:false,rent:"",pension:"",ev:"",kids:0,under3:false,fn:"no"});
+  const [result,setResult]=useState(null);
+  const [showDeds,setShowDeds]=useState(false);
+
+  const [showEmail,setShowEmail]=useState(false);
+  const [eForm,setEForm]=useState({email:"",phone:"",consent:false});
+  const [eStat,setEStat]=useState(null);
+
+  const [aiQ,setAiQ]=useState("");
+  const [aiMsgs,setAiMsgs]=useState([]);
+  const [aiLoad,setAiLoad]=useState(false);
+  const [docF,setDocF]=useState(0);
+
+  const setC=(k,v)=>setCk(p=>({...p,[k]:v}));
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const nF=k=>parseFloat(form[k])||0;
+
+  const doCalc=()=>setResult(runCalc({type:form.type,region:form.region,gross:nF("gross"),foreign:nF("foreign"),auto:nF("auto"),savings:nF("savings"),sit:form.sit,beckham:form.beckham,autonomoTarifa:form.autonomoTarifa,rent:nF("rent"),pension:nF("pension"),ev:nF("ev"),kids:form.kids,under3:form.under3,fn:form.fn}));
+
+  const doAI=async(q)=>{
+    const question=q||aiQ.trim(); if(!question)return;
+    setAiMsgs(p=>[...p,{r:"u",t:question}]); setAiQ(""); setAiLoad(true);
+    try{ const a=await askAI(question,lang); setAiMsgs(p=>[...p,{r:"a",t:a}]); }
+    catch{ setAiMsgs(p=>[...p,{r:"a",t:"❌ Error — try again"}]); }
+    setAiLoad(false);
+  };
+
+  const doEmail=async()=>{
+    if(!eForm.email||!eForm.consent)return;
+    setEStat("sending");
+    try{
+      await window.storage.set(`user:${Date.now()}`,JSON.stringify({email:eForm.email,phone:eForm.phone,lang,registeredAt:new Date().toISOString(),totalTax:result?.totalTax||0,netIncome:result?.net||0}));
+      setEStat("success");
+    }catch{ setEStat("error"); }
+  };
+
+  const docTags={ar:["الكل","IRPF","Autónomo","أجنبي","بيكهام"],en:["All","IRPF","Autónomo","Foreign","Beckham"],es:["Todo","IRPF","Autónomo","Extranjero","Beckham"]};
+  const tags=docTags[lang];
+  const docs=DOCS[lang]||DOCS.en;
+  const filteredDocs=docF===0?docs:docs.filter(d=>d.t.includes(tags[docF]));
+
+  const S={
+    app:{minHeight:"100vh",background:"#0d1117",fontFamily:isRTL?"'Cairo',sans-serif":"'DM Sans',sans-serif",direction:t.dir,color:"#e6edf3"},
+    hdr:{background:"linear-gradient(135deg,#161b22,#1c2128)",borderBottom:"1px solid #30363d",padding:"16px 16px 0"},
+    appName:{margin:0,fontSize:21,fontWeight:800,background:"linear-gradient(90deg,#58a6ff,#bc8cff)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"},
+    appSub:{fontSize:11,color:"#8b949e",margin:"2px 0 12px"},
+    tabRow:{display:"flex",borderTop:"1px solid #21262d",overflowX:"auto"},
+    tabBtn:(a)=>({flex:"0 0 auto",padding:"10px 12px",border:"none",background:"transparent",color:a?"#58a6ff":"#8b949e",borderBottom:a?"2px solid #58a6ff":"2px solid transparent",cursor:"pointer",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}),
+    body:{padding:"14px",maxWidth:500,margin:"0 auto"},
+    card:{background:"#161b22",border:"1px solid #21262d",borderRadius:12,padding:16,marginBottom:14},
+    lbl:{display:"block",fontSize:12,fontWeight:600,color:"#8b949e",marginBottom:6},
+    inp:{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #30363d",background:"#0d1117",color:"#e6edf3",fontSize:15,fontWeight:600,outline:"none",boxSizing:"border-box",direction:"ltr",textAlign:isRTL?"right":"left"},
+    sel:{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #30363d",background:"#0d1117",color:"#e6edf3",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:12},
+    seg:(a,c="#58a6ff")=>({padding:"7px 10px",borderRadius:8,border:`1px solid ${a?c:"#30363d"}`,background:a?`${c}22`:"transparent",color:a?c:"#8b949e",cursor:"pointer",fontSize:11,fontWeight:600,flex:1}),
+    row:{display:"flex",gap:6,flexWrap:"wrap"},
+    calcBtn:{width:"100%",padding:13,borderRadius:10,border:"none",background:"linear-gradient(90deg,#1f6feb,#8957e5)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"},
+    resRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #21262d"},
+    badge:(c)=>({display:"inline-block",padding:"3px 10px",borderRadius:20,background:`${c}22`,border:`1px solid ${c}44`,color:c,fontSize:11,fontWeight:700}),
+    bRow:{display:"flex",justifyContent:"space-between",padding:"6px 10px",background:"#0d1117",borderRadius:7,marginBottom:5,fontSize:12},
+    bubble:(r)=>({padding:"10px 14px",borderRadius:12,marginBottom:10,maxWidth:"88%",fontSize:13,lineHeight:1.6,whiteSpace:"pre-line",background:r==="u"?"rgba(88,166,255,0.12)":"rgba(188,140,255,0.1)",border:`1px solid ${r==="u"?"rgba(88,166,255,0.25)":"rgba(188,140,255,0.2)"}`,alignSelf:r==="u"?(isRTL?"flex-start":"flex-end"):(isRTL?"flex-end":"flex-start"),color:r==="u"?"#79c0ff":"#d2a8ff"}),
+  };
+
+  return (
+    <div style={S.app}>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+      <div style={S.hdr}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div><h1 style={S.appName}>{t.appName}</h1><p style={S.appSub}>{t.appSub}</p></div>
+          <div style={{display:"flex",gap:5}}>
+            {t.langs.map(([l,f])=>(<button key={l} onClick={()=>setLang(l)} style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${lang===l?"#58a6ff":"#30363d"}`,background:lang===l?"rgba(88,166,255,0.15)":"transparent",color:lang===l?"#58a6ff":"#8b949e",cursor:"pointer",fontSize:11,fontWeight:600}}>{f} {l.toUpperCase()}</button>))}
+          </div>
+        </div>
+        <div style={S.tabRow}>
+          {t.nav.map((n,i)=>(<button key={i} onClick={()=>setTab(i)} style={S.tabBtn(tab===i)}>{n}</button>))}
+        </div>
+      </div>
+
+      <div style={S.body}>
+
+        {/* TAB 0: BECKHAM CHECKER */}
+        {tab===0&&(
+          <div>
+            <div style={S.card}>
+              <div style={{fontSize:15,fontWeight:800,color:"#bc8cff",marginBottom:4}}>{t.checkerTitle}</div>
+              <div style={{fontSize:12,color:"#8b949e",marginBottom:16}}>{t.checkerSub}</div>
+              {[
+                ["res",t.q1,[["yes",t.yes,"#ff7b72"],["no",t.no,"#3fb950"]]],
+                ["contract",t.q2,[["yes",t.yes,"#3fb950"],["no",t.no,"#ff7b72"],["notSure",t.notSure,"#f0883e"]]],
+                ["dnv",t.q3,[["yes",t.yes,"#3fb950"],["no",t.no,"#8b949e"]]],
+                ["qualified",t.q4,[["yes",t.yes,"#3fb950"],["no",t.no,"#8b949e"],["notSure",t.notSure,"#f0883e"]]],
+                ["ss",t.q5,[["yes",t.yes,"#58a6ff"],["no",t.no,"#8b949e"]]],
+              ].map(([key,question,opts],qi)=>(
+                <div key={key} style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #21262d"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#e6edf3",marginBottom:8}}><span style={{color:"#8957e5",fontWeight:800}}>{qi+1}. </span>{question}</div>
+                  <div style={S.row}>{opts.map(([v,lbl,col])=>(<button key={v} onClick={()=>setC(key,v)} style={S.seg(ck[key]===v,col)}>{lbl}</button>))}</div>
+                </div>
+              ))}
+              {ck.ss==="yes"&&(
+                <div style={{marginBottom:14,paddingBottom:14,borderBottom:"1px solid #21262d"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#e6edf3",marginBottom:8}}><span style={{color:"#8957e5",fontWeight:800}}>6. </span>{t.q6}</div>
+                  <input type="date" value={ck.ssDate} onChange={e=>setC("ssDate",e.target.value)} style={{...S.inp,maxWidth:200,textAlign:"left"}}/>
+                  {ck.ssDate&&(()=>{
+                    const d=new Date(ck.ssDate),dead=new Date(d); dead.setMonth(dead.getMonth()+6);
+                    const days=Math.floor((dead-new Date())/86400000);
+                    const col=days<0?"#ff7b72":days<30?"#f0883e":"#3fb950";
+                    return <div style={{marginTop:8,fontSize:12,color:col,fontWeight:700}}>{days<0?`🚨 ${Math.abs(days)} ${t.daysGone}`:`⏳ ${days} ${t.daysLeft}`} — {t.deadlineLabel} {dead.toLocaleDateString()}</div>;
+                  })()}
+                </div>
+              )}
+              <button onClick={()=>setCkRes(checkBeckham(ck))} disabled={!ck.res||!ck.contract||!ck.dnv}
+                style={{...S.calcBtn,background:ck.res&&ck.contract&&ck.dnv?"linear-gradient(90deg,#6e40c9,#8957e5)":"#21262d",color:ck.res&&ck.contract&&ck.dnv?"#fff":"#484f58"}}>
+                {t.checkBtn}
+              </button>
+            </div>
+            {ckRes&&(()=>{
+              const cols={eligible:"#3fb950",conditional:"#f0883e",not_eligible:"#ff7b72",expired:"#e74c3c"};
+              const col=cols[ckRes.status];
+              const titles={eligible:t.eligible,conditional:t.conditional,not_eligible:t.notEligible,expired:t.expired};
+              const subs={eligible:t.eligibleSub,conditional:t.conditionalSub,not_eligible:t.notEligibleSub,expired:t.expiredSub};
+              return (
+                <div style={{...S.card,border:`1px solid ${col}44`,background:`${col}08`}}>
+                  <div style={{fontSize:15,fontWeight:800,color:col,marginBottom:4}}>{titles[ckRes.status]}</div>
+                  <div style={{fontSize:12,color:"#8b949e",marginBottom:12}}>{subs[ckRes.status]}</div>
+                  {ckRes.reasons.map((r,i)=>(
+                    <div key={i} style={{fontSize:12,padding:"6px 0",borderBottom:"1px solid #21262d",color:r.t==="good"?"#3fb950":r.t==="bad"?"#ff7b72":"#f0883e",lineHeight:1.5}}>
+                      {r[lang]||r.en}
+                    </div>
+                  ))}
+                  {ckRes.deadline&&<div style={{marginTop:10,padding:"8px 12px",background:"rgba(88,166,255,0.08)",borderRadius:8,fontSize:12}}><span style={{color:"#8b949e"}}>{t.deadlineLabel} </span><span style={{color:"#58a6ff",fontWeight:700}}>{ckRes.deadline}</span></div>}
+                  <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+                    {(ckRes.status==="eligible"||ckRes.status==="conditional")&&<button onClick={()=>setTab(1)} style={{flex:1,padding:"10px",borderRadius:8,border:"none",background:`${col}22`,color:col,fontWeight:700,cursor:"pointer",fontSize:12}}>{t.goCalc}</button>}
+                    {(ckRes.status==="conditional"||ckRes.status==="expired")&&<button style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid #f0883e",background:"transparent",color:"#f0883e",fontWeight:700,cursor:"pointer",fontSize:12}}>{t.gestorBtn}</button>}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* TAB 1: CALCULATOR */}
+        {tab===1&&(
+          <div>
+            <div style={S.card}>
+              <div style={{fontSize:14,fontWeight:700,marginBottom:14}}>{t.profileTitle}</div>
+
+              <div style={{marginBottom:12}}>
+                <label style={S.lbl}>{t.regionLabel}</label>
+                <select style={S.sel} value={form.region} onChange={e=>setF("region",e.target.value)}>
+                  {Object.entries(t.regions).map(([k,v])=>(<option key={k} value={k} style={{background:"#161b22"}}>{v}</option>))}
+                </select>
+              </div>
+
+              <div style={{marginBottom:14}}>
+                <label style={S.lbl}>{t.incomeType}</label>
+                <div style={S.row}>{Object.entries(t.types).map(([k,v])=>(<button key={k} onClick={()=>setF("type",k)} style={S.seg(form.type===k)}>{v}</button>))}</div>
+              </div>
+
+              {form.type!=="autonomo"&&<div style={{marginBottom:12}}><label style={S.lbl}>{t.grossIncome}</label><input style={S.inp} type="number" value={form.gross} onChange={e=>setF("gross",e.target.value)} placeholder="60000"/></div>}
+              {form.type!=="employee"&&<div style={{marginBottom:12}}><label style={S.lbl}>{t.autonomoIncome}</label><input style={S.inp} type="number" value={form.auto} onChange={e=>setF("auto",e.target.value)} placeholder="40000"/></div>}
+              <div style={{marginBottom:12}}><label style={S.lbl}>{t.foreignIncome}</label><input style={S.inp} type="number" value={form.foreign} onChange={e=>setF("foreign",e.target.value)} placeholder="0"/></div>
+              <div style={{marginBottom:14}}><label style={S.lbl}>{t.savingsIncome}</label><input style={S.inp} type="number" value={form.savings} onChange={e=>setF("savings",e.target.value)} placeholder="0"/></div>
+
+              {form.type!=="employee"&&(
+                <div style={{marginBottom:14,padding:10,background:"rgba(240,136,62,0.05)",borderRadius:8,border:"1px solid rgba(240,136,62,0.15)"}}>
+                  <label style={{...S.lbl,color:"#f0883e"}}>{t.autonomoTarifa}</label>
+                  <div style={S.row}>
+                    <button onClick={()=>setF("autonomoTarifa",true)} style={S.seg(form.autonomoTarifa,"#f0883e")}>{t.yes} (€86.65/mes)</button>
+                    <button onClick={()=>setF("autonomoTarifa",false)} style={S.seg(!form.autonomoTarifa,"#8b949e")}>{t.no}</button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{marginBottom:14}}>
+                <label style={S.lbl}>{t.situation}</label>
+                <div style={S.row}>{Object.entries(t.sits).map(([k,v])=>(<button key={k} onClick={()=>setF("sit",k)} style={S.seg(form.sit===k)}>{v}</button>))}</div>
+              </div>
+
+              <div style={{marginBottom:14}}>
+                <label style={S.lbl}>{t.beckham}</label>
+                <div style={S.row}>
+                  <button onClick={()=>setF("beckham",true)} style={S.seg(form.beckham,"#8957e5")}>{t.beckhamY}</button>
+                  <button onClick={()=>setF("beckham",false)} style={S.seg(!form.beckham,"#58a6ff")}>{t.beckhamN}</button>
+                </div>
+              </div>
+
+              {/* Children */}
+              <div style={{marginBottom:14,padding:12,background:"rgba(88,166,255,0.04)",borderRadius:10,border:"1px solid rgba(88,166,255,0.1)"}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#58a6ff",marginBottom:10}}>👨‍👩‍👧‍👦 {t.childrenTitle}</div>
+                <label style={S.lbl}>{t.numChildren}</label>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <button onClick={()=>setF("kids",Math.max(0,form.kids-1))} style={{width:32,height:32,borderRadius:6,border:"1px solid #30363d",background:"#0d1117",color:"#e6edf3",cursor:"pointer",fontSize:16}}>−</button>
+                  <span style={{fontSize:20,fontWeight:800,color:"#58a6ff",minWidth:24,textAlign:"center"}}>{form.kids}</span>
+                  <button onClick={()=>setF("kids",Math.min(10,form.kids+1))} style={{width:32,height:32,borderRadius:6,border:"1px solid #30363d",background:"#0d1117",color:"#e6edf3",cursor:"pointer",fontSize:16}}>+</button>
+                  {form.kids>0&&<span style={{fontSize:11,color:"#8b949e"}}>{lang==="ar"?"إعفاء:":lang==="es"?"Mínimo:":"Allow:"} {fE(childAllow(form.kids,form.under3))}</span>}
+                </div>
+                {form.kids>0&&(
+                  <>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,cursor:"pointer"}} onClick={()=>setF("under3",!form.under3)}>
+                      <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${form.under3?"#58a6ff":"#30363d"}`,background:form.under3?"#58a6ff":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        {form.under3&&<span style={{color:"#0d1117",fontSize:11,fontWeight:900}}>✓</span>}
+                      </div>
+                      <span style={{fontSize:12,color:"#8b949e"}}>{t.childrenUnder3}</span>
+                    </div>
+                    {form.kids>=3&&(
+                      <div>
+                        <label style={S.lbl}>{t.fnLabel}</label>
+                        <div style={{...S.row,flexWrap:"wrap"}}>
+                          {[["no",t.fnNo,"#8b949e"],["general",t.fnGeneral,"#f0883e"],["special",t.fnSpecial,"#ff7b72"]].map(([k,v,c])=>(
+                            <button key={k} onClick={()=>setF("fn",k)} style={{...S.seg(form.fn===k,c),fontSize:11,flex:"0 0 auto"}}>{v}</button>
+                          ))}
+                        </div>
+                        {form.fn!=="no"&&<div style={{fontSize:11,color:"#f0883e",marginTop:5}}>💰 Credit: −{fE(fnCredit(form.fn))}</div>}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Deductions */}
+              <button onClick={()=>setShowDeds(p=>!p)} style={{background:"none",border:"1px solid #30363d",color:"#8b949e",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:12,marginBottom:showDeds?12:0,width:"100%",textAlign:isRTL?"right":"left"}}>
+                {t.deductions}
+              </button>
+              {showDeds&&(
+                <div style={{marginBottom:12}}>
+                  {[["rent",t.dedRent],["pension",t.dedPension],["ev",t.dedEv]].map(([k,lbl])=>(
+                    <div key={k} style={{marginBottom:10}}><label style={S.lbl}>{lbl}</label><input style={S.inp} type="number" value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder="0"/></div>
+                  ))}
+                </div>
+              )}
+
+              <button onClick={doCalc} style={{...S.calcBtn,marginTop:8}}>{t.calcBtn}</button>
+            </div>
+
+            {/* RESULTS */}
+            {result&&(
+              <div style={S.card}>
+                {form.beckham&&<div style={{...S.badge("#8957e5"),marginBottom:12,display:"block"}}>{t.beckhamBadge}</div>}
+                <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>{t.resTitle}</div>
+                {[
+                  [t.totalGross,result.gross,"#e6edf3"],
+                  [t.ssTax,result.ss,"#f0883e"],
+                  ...(result.ca>0?[[t.childAllowLabel,result.ca,"#58a6ff"]]:[]),
+                  [t.irpfTax,result.irpf,"#ff7b72"],
+                  ...(result.savTax>0?[[t.savingsTax,result.savTax,"#ffa657"]]:[]),
+                  [t.totalTax,result.totalTax,"#ff7b72"],
+                  [t.effectRate,result.eff+"%","#e6edf3"],
+                  [t.netIncome,result.net,"#3fb950"],
+                ].map(([lbl,val,col])=>(
+                  <div key={lbl} style={S.resRow}>
+                    <span style={{fontSize:13,color:"#8b949e"}}>{lbl}</span>
+                    <div style={{textAlign:"end"}}>
+                      <span style={{fontSize:16,fontWeight:700,color:col,direction:"ltr"}}>{lbl===t.effectRate?val:fE(val)}</span>
+                      {lbl===t.netIncome&&<div style={{fontSize:11,color:"#8b949e",direction:"ltr"}}>{fE(result.net/12)} / {t.monthly}</div>}
+                    </div>
+                  </div>
+                ))}
+                {form.beckham&&result.bSave>0&&<div style={{marginTop:10,...S.badge("#3fb950"),display:"block"}}>💰 {t.saving}: {fE(result.bSave)}</div>}
+
+                {!form.beckham&&result.det.length>0&&(
+                  <><div style={{fontSize:12,fontWeight:700,color:"#8b949e",margin:"12px 0 8px"}}>{t.bracketsTitle}</div>
+                  {result.det.map((b,i)=>(<div key={i} style={S.bRow}><span style={{color:"#8b949e",direction:"ltr"}}>€{fmt(b.min)}–{b.max===Infinity?"∞":`€${fmt(b.max)}`}</span><span style={{color:"#ffa657",fontWeight:700}}>{b.r}%</span><span style={{color:"#ff7b72",fontWeight:700,direction:"ltr"}}>{fE(b.tax)}</span></div>))}</>
+                )}
+                {result.savDet.length>0&&(
+                  <><div style={{fontSize:12,fontWeight:700,color:"#8b949e",margin:"12px 0 8px"}}>{t.savingsTitle}</div>
+                  {result.savDet.map((b,i)=>(<div key={i} style={S.bRow}><span style={{color:"#8b949e",direction:"ltr"}}>€{fmt(b.min)}–{b.max===Infinity?"∞":`€${fmt(b.max)}`}</span><span style={{color:"#ffa657",fontWeight:700}}>{b.r}%</span><span style={{color:"#ff7b72",fontWeight:700,direction:"ltr"}}>{fE(b.tax)}</span></div>))}</>
+                )}
+                {form.type!=="employee"&&result.qIRPF>0&&(
+                  <><div style={{fontSize:12,fontWeight:700,color:"#8b949e",margin:"12px 0 8px"}}>{t.autonomoTitle}</div>
+                  {[t.q1l,t.q2l,t.q3l,t.q4l].map((q,i)=>(
+                    <div key={i} style={{...S.bRow,flexDirection:"column",gap:3,marginBottom:6}}>
+                      <span style={{color:"#58a6ff",fontWeight:700}}>{q}</span>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#8b949e",fontSize:11}}>{t.m130}</span><span style={{color:"#ff7b72",fontWeight:600,direction:"ltr"}}>{fE(result.qIRPF)}</span></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#8b949e",fontSize:11}}>{t.ivaL}</span><span style={{color:"#ffa657",fontWeight:600,direction:"ltr"}}>{fE(result.qIVA)}</span></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#8b949e",fontSize:11}}>SS/month</span><span style={{color:"#f0883e",fontWeight:600,direction:"ltr"}}>{fE(result.qSS)}</span></div>
+                    </div>
+                  ))}</>
+                )}
+                <p style={{fontSize:11,color:"#484f58",marginTop:14,lineHeight:1.6}}>{t.disclaimer}</p>
+
+                {!showEmail&&<button onClick={()=>setShowEmail(true)} style={{width:"100%",marginTop:10,padding:"11px",borderRadius:10,border:"1px solid #3fb950",background:"rgba(63,185,80,0.08)",color:"#3fb950",fontWeight:700,cursor:"pointer",fontSize:13}}>📩 {t.sendBtn}</button>}
+                {showEmail&&eStat!=="success"&&(
+                  <div style={{marginTop:12,padding:14,background:"rgba(63,185,80,0.05)",borderRadius:12,border:"1px solid rgba(63,185,80,0.2)"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#3fb950",marginBottom:10}}>{t.emailCapTitle}</div>
+                    <div style={{marginBottom:10}}><label style={S.lbl}>{t.emailLabel} *</label><input style={S.inp} type="email" value={eForm.email} onChange={e=>setEForm(p=>({...p,email:e.target.value}))} placeholder={t.emailPh}/></div>
+                    <div style={{marginBottom:12}}><label style={S.lbl}>{t.phoneLbl}</label><input style={S.inp} type="tel" value={eForm.phone} onChange={e=>setEForm(p=>({...p,phone:e.target.value}))} placeholder={t.phonePh}/></div>
+                    <div style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:12,cursor:"pointer"}} onClick={()=>setEForm(p=>({...p,consent:!p.consent}))}>
+                      <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${eForm.consent?"#3fb950":"#30363d"}`,background:eForm.consent?"#3fb950":"transparent",flexShrink:0,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        {eForm.consent&&<span style={{color:"#0d1117",fontSize:11,fontWeight:900}}>✓</span>}
+                      </div>
+                      <span style={{fontSize:11,color:"#8b949e",lineHeight:1.5}}>{t.consentTxt}</span>
+                    </div>
+                    <div style={{fontSize:11,color:"#484f58",marginBottom:12}}>{t.privacyNote}</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={doEmail} disabled={!eForm.email||!eForm.consent||eStat==="sending"} style={{flex:1,padding:"10px",borderRadius:8,border:"none",background:eForm.email&&eForm.consent?"linear-gradient(90deg,#238636,#2ea043)":"#21262d",color:eForm.email&&eForm.consent?"#fff":"#484f58",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                        {eStat==="sending"?t.sendingBtn:t.sendBtn}
+                      </button>
+                      <button onClick={()=>setShowEmail(false)} style={{padding:"10px 12px",borderRadius:8,border:"1px solid #30363d",background:"transparent",color:"#8b949e",cursor:"pointer",fontSize:12}}>{t.skipBtn}</button>
+                    </div>
+                    {eStat==="error"&&<div style={{marginTop:8,fontSize:12,color:"#ff7b72"}}>{t.errorMsg}</div>}
+                  </div>
+                )}
+                {eStat==="success"&&<div style={{marginTop:12,padding:14,background:"rgba(63,185,80,0.1)",borderRadius:12,border:"1px solid rgba(63,185,80,0.3)",textAlign:"center"}}><div style={{fontSize:18,marginBottom:4}}>🎉</div><div style={{fontSize:13,fontWeight:700,color:"#3fb950"}}>{t.successMsg}</div></div>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: AI ADVISOR */}
+        {tab===2&&(
+          <div style={S.card}>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:4}}>{t.aiTitle}</div>
+            <div style={{fontSize:12,color:"#8b949e",marginBottom:12}}>{t.aiSub}</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+              {t.aiSugs.map((s,i)=>(<button key={i} onClick={()=>doAI(s)} style={{padding:"5px 10px",borderRadius:20,border:"1px solid #30363d",background:"transparent",color:"#8b949e",cursor:"pointer",fontSize:11}}>{s}</button>))}
+            </div>
+            <div style={{minHeight:180,display:"flex",flexDirection:"column",marginBottom:12}}>
+              {aiMsgs.map((m,i)=>(<div key={i} style={{display:"flex",justifyContent:m.r==="u"?(isRTL?"flex-start":"flex-end"):(isRTL?"flex-end":"flex-start")}}><div style={S.bubble(m.r)}>{m.t}</div></div>))}
+              {aiLoad&&<div style={{display:"flex",justifyContent:isRTL?"flex-end":"flex-start"}}><div style={{...S.bubble("a"),opacity:.7}}>{t.aiThinking} ⏳</div></div>}
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+              <textarea style={{flex:1,padding:"10px 12px",borderRadius:10,border:"1px solid #30363d",background:"#0d1117",color:"#e6edf3",fontSize:13,outline:"none",resize:"none"}} rows={2} value={aiQ} onChange={e=>setAiQ(e.target.value)} placeholder={t.aiPh} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();doAI();}}}/>
+              <button onClick={()=>doAI()} style={{padding:"10px 16px",borderRadius:10,border:"none",background:"linear-gradient(90deg,#1f6feb,#8957e5)",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}}>{t.aiSend}</button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: DOCS */}
+        {tab===3&&(
+          <div>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>{t.docsTitle}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+              {tags.map((tg,i)=>(<button key={i} onClick={()=>setDocF(i)} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${docF===i?"#58a6ff":"#30363d"}`,background:docF===i?"rgba(88,166,255,0.15)":"transparent",color:docF===i?"#58a6ff":"#8b949e",cursor:"pointer",fontSize:11,fontWeight:600}}>{tg}</button>))}
+            </div>
+            {filteredDocs.map((d,i)=>(
+              <div key={i} style={{display:"flex",gap:12,padding:"12px 14px",background:"#161b22",borderRadius:10,marginBottom:8,border:"1px solid #21262d",alignItems:"flex-start"}}>
+                <span style={{fontSize:22,flexShrink:0}}>{d.i}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>{d.n}</div>
+                  <div style={{fontSize:12,color:"#8b949e",lineHeight:1.5}}>{d.d}</div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:6}}>
+                    {d.t.map(tg=>(<span key={tg} style={{padding:"2px 8px",borderRadius:12,background:"rgba(88,166,255,0.1)",border:"1px solid rgba(88,166,255,0.2)",color:"#58a6ff",fontSize:10}}>{tg}</span>))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* TAB 4: CALENDAR */}
+        {tab===4&&(
+          <div>
+            <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>{t.datesTitle}</div>
+            {DATES[lang].map((d,i)=>(
+              <div key={i} style={{display:"flex",gap:12,padding:"12px 14px",background:d.u?"rgba(231,76,60,0.06)":"#161b22",borderRadius:10,marginBottom:8,border:`1px solid ${d.u?"rgba(231,76,60,0.3)":"#21262d"}`,alignItems:"flex-start"}}>
+                <div style={{minWidth:70,background:`${d.c}18`,border:`1px solid ${d.c}44`,borderRadius:8,padding:"5px 6px",textAlign:"center",flexShrink:0}}>
+                  <div style={{fontSize:10,color:d.c,fontWeight:700,lineHeight:1.3}}>{d.p}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                    <span style={{fontWeight:700,fontSize:13,color:d.c}}>{d.l}</span>
+                    {d.u&&<span style={{padding:"2px 7px",borderRadius:10,background:"rgba(231,76,60,0.2)",border:"1px solid rgba(231,76,60,0.4)",color:"#e74c3c",fontSize:9,fontWeight:700}}>{t.urgentLabel}</span>}
+                  </div>
+                  <div style={{fontSize:12,color:"#8b949e",lineHeight:1.5}}>{d.d}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      React.createElement(React.StrictMode, null, React.createElement(App, null))
+    );
+  </script>
+</body>
+</html>
